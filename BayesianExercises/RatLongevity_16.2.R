@@ -9,6 +9,7 @@ cat('\014')
 graphics.off()
 
 library('rstan')
+source('./getHDI.R')
 
 #specify model
 stanCode= '
@@ -69,5 +70,31 @@ chain3= as.array(stanOUT)[,3,]
 head(chain1)
 
 #check runs
-plot(chain1[,2],main='mu1',type='l')
-lines(chain2[,2],col='red')
+for(i in 1:dim(chain1)[2]){
+  plot(chain1[,i],main=paste(colnames(chain1)[i]),type='l')
+  lines(chain2[,i],col='red')
+  lines(chain3[,i],col='green')
+}
+
+#visualize posterior sample
+for(i in 1:dim(chain1)[2]){
+  #calculate HDI
+  HDI= getHDI(chain1[,i],HDI_width= 0.95)
+  
+  plot(density(chain1[,i]),main=paste(colnames(chain1)[i]),type='l')
+  lines(density(chain2[,i]),col='red')
+  lines(density(chain3[,i]),col='green')
+  
+  lines(x=HDI,y=c(0,0),lwd=3)  #HDI based on chain1
+}
+
+#effect size: (mu2-mu1) /(sqrt(sig1^2+sig2^2))
+effSize1= (chain1[,2]-chain1[,3])/ sqrt(chain1[,4]^2+chain1[,5]^2)
+plot(density(effSize1),main="Effect Size")
+effSize2= (chain2[,2]-chain2[,3])/ sqrt(chain2[,4]^2+chain2[,5]^2)
+lines(density(effSize2),col='red')
+effSize3= (chain3[,2]-chain3[,3])/ sqrt(chain3[,4]^2+chain3[,5]^2)
+lines(density(effSize3),col='green')
+
+HDI_effSize1= getHDI(effSize1,HDI_width= 0.95)
+lines(x=HDI_effSize1,y=c(0,0),lwd=3)  #HDI based on chain1
