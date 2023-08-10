@@ -98,3 +98,19 @@ lines(density(effSize3),col='green')
 
 HDI_effSize1= getHDI(effSize1,HDI_width= 0.95)
 lines(x=HDI_effSize1,y=c(0,0),lwd=3)  #HDI based on chain1
+
+ROPE= c(-.1,.1)  #arbitrary ROPE
+lines(x=ROPE,y=c(0.01,0.01),col='blue',lwd=3)  #HDI based on chain1
+
+#differences in scale
+diffSig1= chain1[,5]-chain1[,4]
+plot(density(diffSig1), main="Diff. in sigma: CR vs. ad lib.")
+diffSig2= chain2[,5]-chain2[,4]
+lines(density(diffSig2), col='red')
+diffSig3= chain3[,5]-chain3[,4]
+lines(density(diffSig3), col='green')
+
+#The groups are largely different in their central tendencies
+#The groups largely differ in their scale parameter (higher variation with CR)
+#The normality parameter is only around 3; this suggests sample is heavily influenced
+ #by outliers and far from normality
