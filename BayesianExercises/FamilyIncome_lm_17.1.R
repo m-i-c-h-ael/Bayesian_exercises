@@ -54,11 +54,12 @@ model{
 }'
 
 csv= read.csv('H:/My Drive/learning/20230220_BayesianStatistics/20230504_BayesianDogsBook/DBDA2Eprograms/IncomeFamszState.csv')
+csv$s= as.numeric(as.factor(csv$State))
 head(csv)
 dataList= list(
   y= csv$Income,
   x= csv$Famsz,
-  s= as.numeric(as.factor(csv$State)),
+  s= csv$s,
   Ntotal= dim(csv)[1],
   Nstates= length(unique(csv$State))
 )
@@ -73,6 +74,32 @@ head(chain1)
 
 #plot state 20
 state20= levels(as.factor(csv$State))[20]
+set.seed(11082023)
+rand_idx= sample(1:dim(chain1)[1],size=50)
 ggplot(data= csv[csv$State==state20,],aes(x=Famsz,y=Income))+
   geom_point()+
-  coord_cartesian(ylim=c(0,max(csv$Income[csv$State==state20])))
+  coord_cartesian(ylim=c(0,max(csv$Income[csv$State==state20])))+
+  geom_abline(intercept=chain1$beta0.20.[rand_idx],slope=chain1$beta1.20.[rand_idx],col='blue')
+
+#generate posterior predictive of credible values (variation not considered)
+chain1_50= chain1[rand_idx,]
+head(csv)
+postPredMtx= matrix(NA,nrow=dim(csv)[1],ncol=length(rand_idx))  #50 simulations for each datapoint
+for(i in 1:dim(csv)[1]){
+  postPredMtx[i,]= chain1_50[,csv$s[i]] + chain1_50[,csv$s[i]+52] * csv$Famsz[i]
+}
+head(postPredMtx)
+
+#calculate mean difference of each datapoint from prediction (absolute difference!)
+csv$meanDiff= rep(NA,dim(csv)[1])
+for(i in 1:dim(csv)[1]){
+  csv$meanDiff[i]= mean(csv$Income[i]-postPredMtx[i,])
+}
+
+ggplot(data=csv,aes(x=State,y=meanDiff,group=as.factor(Famsz),fill=as.factor(Famsz)))+
+  geom_bar(stat='identity',position='dodge')
+
+#the data show that the true value is below the predicted value for small and big families
+ #the true value is above predicted value for intermediate-size families
+
+####### ///////////////////////////////////// ###########
