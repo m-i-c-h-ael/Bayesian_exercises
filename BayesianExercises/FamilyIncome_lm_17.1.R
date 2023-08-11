@@ -103,3 +103,64 @@ ggplot(data=csv,aes(x=State,y=meanDiff,group=as.factor(Famsz),fill=as.factor(Fam
  #the true value is above predicted value for intermediate-size families
 
 ####### ///////////////////////////////////// ###########
+# using Stan
+
+library('rstan')
+
+stanMod= 
+'data{
+  int<lower=1> Nstates;
+  int<lower=1> Ntotal;
+  real M;
+  real<lower=0> S;
+  int s[Ntotal];
+  real x[Ntotal];
+  real y[Ntotal];
+}
+transformed data{
+  real<lower=0> L;
+  real<lower=0> H;
+  L= M/1000;
+  H= M*1000;
+}
+parameters{
+  real<lower=0> nuMin1;
+  real <lower=0> mu0;
+  real mu1;
+  real<lower=0> sig;
+  real<lower=0> sig0;
+  real<lower=0> sig1;
+  real beta0[Nstates];
+  real beta1[Nstates];
+  //real mu[Ntotal];
+}
+transformed parameters{
+    real<lower=1> nu;
+    nu= nuMin1+1;
+}
+model{
+  mu0 ~ normal(M,S);
+  mu1 ~ normal(M,S);
+  sig0 ~ uniform(L,H);
+  sig1 ~ uniform(L,H);
+  sig ~ uniform(L,H);
+  nuMin1 ~ exponential(1/29.0);
+  for(j in 1:Nstates){
+    beta0[j] ~ normal(mu0,sig0);
+    beta1[j] ~ normal(mu1,sig1);
+  }
+  for(i in 1:Ntotal){
+    //mu[i] = beta0[s[i]] + beta1[s[i]]*x[i];
+    y[i] ~ student_t(nu,beta0[s[i]] + beta1[s[i]]*x[i],sig);
+  }
+}
+'
+
+dataList2= dataList
+dataList2$M= mean(dataList$y)
+dataList2$S= sd(dataList$y)
+
+DSO= stan_model(model_code= stanMod)
+stanOUT= sampling(DSO,data=dataList2,iter=1000,warmup=500,chains=1,
+    init=list(list(nuMin1= 10,mu0=mean(csv$Income),mu1=0,sig=mean(csv$Income)/10,sig0=mean(csv$Income)/10,sig1=1,
+              beta0=rep(mean(csv$Income),dataList2$Nstates),beta1=rep(0,dataList2$Nstates))))
