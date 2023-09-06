@@ -46,7 +46,7 @@ model{
   }
   b0= mean(m[1:x1Lvls,1:x2Lvls])
   for(i in 1:x1Lvls){
-    b1[i]= mean(m[i,x2Lvls])-b0
+    b1[i]= mean(m[i,1:x2Lvls])-b0
   }
   for(j in 1:x2Lvls){
     b2[j]= mean(m[1:x1Lvls,j])-b0
@@ -85,7 +85,7 @@ modStr_datIn=    #mean and sd in input instead of calculated in data-block
   }
   b0= mean(m[1:x1Lvls,1:x2Lvls])
   for(i in 1:x1Lvls){
-    b1[i]= mean(m[i,x2Lvls])-b0
+    b1[i]= mean(m[i,1:x2Lvls])-b0
   }
   for(j in 1:x2Lvls){
     b2[j]= mean(m[1:x1Lvls,j])-b0
@@ -149,20 +149,13 @@ modStr_bookNames=    #my code, but with variable names from book
   a1a2SD ~ dgamma(agammaShRa[1],agammaShRa[2])
   
   # 0-sum game
-  for(i in 1:Nx1Lvl){
-    for(j in 1:Nx2Lvl){
-      m[i,j]= a0 + a1[i] + a2[j] + a1a2[i,j]
-    }
-  }
+  for(i in 1:Nx1Lvl){    for(j in 1:Nx2Lvl){ 
+    m[i,j]= a0 + a1[i] + a2[j] + a1a2[i,j] } }
+  
   b0= mean(m[1:Nx1Lvl,1:Nx2Lvl])
-  for(i in 1:Nx1Lvl){
-    b1[i]= mean(m[i,Nx2Lvl])-b0
-  }
-  for(j in 1:Nx2Lvl){
-    b2[j]= mean(m[1:Nx1Lvl,j])-b0
-    for(i in 1:Nx1Lvl){
-      b1b2[i,j]= m[i,j]-(b0+b1[i]+b2[j])
-    }
+  for(i in 1:Nx1Lvl){ b1[i]= mean(m[i,1:Nx2Lvl])-b0  }
+  for(j in 1:Nx2Lvl){ b2[j]= mean(m[1:Nx1Lvl,j])-b0
+    for(i in 1:Nx1Lvl){ b1b2[i,j]= m[i,j]-(b0+b1[i]+b2[j]) }
   }
 }'
 
@@ -206,9 +199,9 @@ dataList_datIn= list(
   sh= unlist( gammaShRaFromModeSD(mode= sd(data$SeaweedAmt)/2, sd= sd(data$SeaweedAmt)*2) )
 )
 
-# jagMod= jags.model(file=textConnection(modStr),data=dataList,n.chains=3)   #my model
-# cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','sig_y',
-#                                                 'sig_b1','sig_b2','sig_b1b2'),n.iter=10000)
+jagMod= jags.model(file=textConnection(modStr),data=dataList,n.chains=3)   #my model
+cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','sig_y',
+                                                'sig_b1','sig_b2','sig_b1b2'),n.iter=10000)
 
 # jagMod= jags.model(file=textConnection(modelstring),data=dataList2,n.chains=3)   #script from book
 # cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','ySigma',
@@ -218,14 +211,9 @@ dataList_datIn= list(
 # cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','sig_y',
 #                                                 'sig_b1','sig_b2','sig_b1b2'),n.iter=10000)
 
-jagMod= jags.model(file=textConnection(modStr_bookNames),data=dataList2,n.chains=3)   #my model, but book names
-cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','ySigma',
-                                                'a1SD','a2SD','a1a2SD'),n.iter=10000)
-
-#parNames= colnames(data.frame(cS[[1]]))
-# for(i in c(1:12,57:67)){
-#   diagMCMC(cS, parName = varnames(cS)[i])
-# }
+# jagMod= jags.model(file=textConnection(modStr_bookNames),data=dataList2,n.chains=3)   #my model, but book names
+# cS= coda.samples(model=jagMod, variable.names=c('b0','b1','b2','b1b2','ySigma',
+#                                                 'a1SD','a2SD','a1a2SD'),n.iter=10000)
 
 mcmcList= coda::as.mcmc.list(cS)
 summaryInfo = smryMCMC( mcmcList)
@@ -242,31 +230,19 @@ colnames(cS[[1]]) [match(
     ']',sep=''),
   colnames(cS[[1]]))]= 
   paste( rep(Zones,each=length(Grazers)),rep(Grazers,times=length(Zones)),sep='x' )
+colnames(cS[[1]])[colnames(cS[[1]])=='b0']= 'basel'
 colnames(cS[[1]])
 
-means= apply(DF1,2,mean)
-names(means)= c('basel',
-                  Zones,
-                  paste( rep(Zones,each=length(Grazers)),rep(Grazers,times=length(Zones)),sep='x' ),
-                  Grazers,
-                  'sig_b1','sig_b1b2','sig_b2','sig_y')
-#melt(DF1a,measure.vars=2:9,value.name='zoneMean')
+means= apply(cS[[1]],2,mean)
 
-# ZoneDF= DF1a[ DF1a$names %in% Zones, ]
-# GrazerDF= DF1a[ DF1a$names %in% Grazers, ]
-# ZoneVec= as.numeric(ZoneDF$means,names=ZoneDF$names)
-
-# gridName= c( rep(names(means)[2:9],times=length(58:63)),
-#               rep(names(means)[58:63],each=length(2:9))
-# )
-gridNames= expand.grid(Zone=names(means)[2:9],Grazer=names(means)[58:63])
-grid= expand.grid(SeawZone= means[2:9], SeawGrazers= means[58:63])
+ZonesIdx= match(Zones,colnames(cS[[1]]))
+GrazersIdx= match(Grazers,colnames(cS[[1]]))
+gridNames= expand.grid(Zone= factor(Zones,ordered=TRUE),
+                       Grazer=factor(Grazers,levels=c("None","f","fF","L","Lf","LfF")))
+grid= expand.grid(SeawZone= means[ZonesIdx], SeawGrazers= means[GrazersIdx])
 grid= cbind.data.frame(gridNames,basel=rep(means['basel'],dim(grid)[1]),grid)
-
-#rearrange factor levels
-levels(grid$Grazer)
-#ord= match(levels(grid$Grazer),c("None","f","fF","L","Lf","LfF"))
-grid$Grazer= factor(grid$Grazer,levels=c("None","f","fF","L","Lf","LfF"))
+head(grid)
+str(grid)
 data$Grazer= factor(data$Grazer,levels=c("None","f","fF","L","Lf","LfF"))
 
 ggplot(data=grid,aes(group=Zone))+   #
