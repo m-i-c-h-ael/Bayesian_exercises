@@ -154,3 +154,115 @@ hist(DF2_rob$guess,breaks=50,col='skyblue')
 
   #with data from normal distribution, the estimates are pretty good; mode of b1
    #is around 3.7
+
+###########
+#21.2. Nominal predictor: Modeled as logistic function with normal prior vs.
+ #beta distribution w/o transformation
+
+#A, Specify model
+rm(list=ls())
+graphics.off()
+cat('\014')
+
+library('rjags')
+source('G:/My Drive/learning/20230220_BayesianStatistics/20230504_BayesianDogsBook/DBDA2Eprograms/DBDA2E-utilities.R')
+
+modStr=
+'model{
+  for(i in 1:Ntotal){
+    x[i] ~ dbern(theta)
+  }
+  theta= ilogit(beta)
+  
+  #Prior
+  beta ~ dnorm(0,1/2^2)
+}'
+
+modStr_beta=
+'model{
+  for(i in 1:Ntotal){
+    x[i] ~ dbern(theta)
+  }
+  #Prior
+  theta ~ dbeta(1,1)
+}'
+
+data= read.csv("../DBDA2Eprograms/z15N50.csv")
+head(data)
+dataList= list(x=data$y, Ntotal= dim(data)[1])
+
+jagMod= jags.model(file=textConnection(modStr),data=dataList,n.chains=3)
+
+#B, Plot prior
+ #Prior from dedicated model
+modStrPr=
+  'model{
+  theta= ilogit(beta)
+  
+  #Prior
+  beta ~ dnorm(0,1/2^2)
+}'
+
+#dataListPr= list(x=data$y,Ntotal=0)
+jagModPr= jags.model(file=textConnection(modStrPr),data=dataList,n.chains=3)
+cS_Pr= coda.samples(model=jagModPr,variable.names = c('theta'),n.iter=10000)
+
+diagMCMC(cS_Pr)
+dev.new()
+
+  #Prior from full model w/o data
+dataListPr= list(x=0,Ntotal=0)
+
+jagModPr= jags.model(file=textConnection(modStr),data=dataListPr,n.chains=3)
+cS_Pr= coda.samples(model=jagModPr,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_Pr)
+b_1_Pr= data.frame(cS_Pr[[1]])[,1]
+
+jagModPr_beta= jags.model(file=textConnection(modStr_beta),data=dataListPr,n.chains=3)
+cS_Pr_beta= coda.samples(model=jagModPr_beta,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_Pr_beta)
+b_1_beta_Pr= data.frame(cS_Pr_beta[[1]])[,1]
+
+#C One flip, one head
+graphics.off()
+oneHead= list(x=1,Ntotal=1)
+
+jagMod1H= jags.model(file=textConnection(modStr),data=oneHead,n.chains=3)
+cS_1H= coda.samples(model=jagMod1H,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_1H)
+b_1_1H= data.frame(cS_1H[[1]])[,1]
+#dev.new()
+par(mfrow=c(2,1))
+hist(b_1_Pr,col='skyblue',main='Prior (logistic)')
+hist(b_1_1H,col='skyblue',main='1 head (logistic)')
+
+
+jagMod_beta_1H= jags.model(file=textConnection(modStr_beta),data=oneHead,n.chains=3)
+cS_beta_1H= coda.samples(model=jagMod_beta_1H,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_beta_1H)
+b_1_beta_1H= data.frame(cS_beta_1H[[1]])[,1]
+par(mfrow=c(2,1))
+hist(b_1_beta_Pr,col='skyblue',main='Prior (beta)')
+hist(b_1_beta_1H,col='skyblue',main='1 head (beta)')
+
+#Posteriors look similar for the two models; logistic model puts even a bit
+ #more credibility on H, as prior had more weight on extreme theta-values
+
+#C 40 flips with 30 heads
+graphics.off()
+H30= list(x=c(rep(1,30),rep(0,40-30)), Ntotal=40)
+
+jagMod30H= jags.model(file=textConnection(modStr),data=H30,n.chains=3)
+cS_30H= coda.samples(model=jagMod30H,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_30H)
+dev.new()
+b_1_30H= data.frame(cS_30H[[1]])[,1]
+hist(b_1_30H,col='skyblue',main='30 heads (logistic)')
+
+jagMod_beta_30H= jags.model(file=textConnection(modStr_beta),data=H30,n.chains=3)
+cS_beta_30H= coda.samples(model=jagMod_beta_30H,variable.names = c('theta'),n.iter=10000)
+diagMCMC(cS_beta_30H)
+dev.new()
+b_1_beta_30H= data.frame(cS_beta_30H[[1]])[,1]
+hist(b_1_beta_30H,col='skyblue',main='30 heads (beta)')
+ #Posterior distributions look virtually identical
