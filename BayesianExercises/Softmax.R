@@ -1,0 +1,134 @@
+rm(list=ls())
+graphics.off()
+cat('\014')
+
+#22.1
+#A Intuition about coefficients
+set.seed(07092023)
+
+# Reference: 2
+x= seq(0,2,.01)
+
+coefDF= cbind.data.frame(
+  b0= c(1,0,-2),
+  b1= c(-2,0,2)
+)
+coefDF
+
+linfun= function(x,b){
+  y= exp(b[1]+b[2]*x)
+  return(y)
+}
+
+p= matrix(nrow=dim(coefDF)[1],ncol=length(x))
+for(r in 1:nrow(coefDF)){
+   p[r,]= linfun(x=x,b=as.numeric(coefDF[r,]))/ 
+       apply( apply(coefDF,1,function(b){linfun(x=x,as.numeric(b))}),1,sum )
+}
+
+colors= c('black','red','gold')
+plot(type='n',x=0,y=0,xlim=range(x),ylim=c(0,1),xlab='x',ylab='prob')
+for(r in 1:nrow(p)){
+  lines(x,p[r,],col=colors[r])
+}
+
+samp= apply(p,2,function(x){sample(c(1,2,3),size=1,prob=x)})
+plot(type='n',x=0,y=0,xlim=range(x),ylim=c(0,1),xlab='x',ylab='')
+text(x,0.5+rnorm(length(samp),mean=0,sd=.1),labels=samp,col=colors[samp])
+
+
+# Reference: 1
+x= seq(0,2,.01)
+
+coefDF= cbind.data.frame(
+  b0= c(0,-0.8,-2.5),
+  b1= c(0,1.5,2.7)
+)
+coefDF
+
+linfun= function(x,b){
+  y= exp(b[1]+b[2]*x)
+  return(y)
+}
+
+p= matrix(nrow=dim(coefDF)[1],ncol=length(x))
+for(r in 1:nrow(coefDF)){
+  p[r,]= linfun(x=x,b=as.numeric(coefDF[r,]))/ 
+    apply( apply(coefDF,1,function(b){linfun(x=x,as.numeric(b))}),1,sum )
+}
+
+colors= c('black','red','gold')
+plot(type='n',x=0,y=0,xlim=range(x),ylim=c(0,1),xlab='x',ylab='prob')
+for(r in 1:nrow(p)){
+  lines(x,p[r,],col=colors[r])
+}
+
+samp= apply(p,2,function(x){sample(c(1,2,3),size=1,prob=x)})
+plot(type='n',x=0,y=0,xlim=range(x),ylim=c(0,1),xlab='x',ylab='')
+text(x,0.5+rnorm(length(samp),mean=0,sd=.1),labels=samp,col=colors[samp])
+
+#B, Softmax model
+softM= '
+data{
+  mean_x1= mean(x1)
+  sd_x1= sd(x1)
+  mean_x2= mean(x2)
+  sd_x2= sd(x2)
+  for(i in 1:Ntotal){
+    z1[i]= (x1[i]-mean_x1)/sd_x1
+    z2[i]= (x2[i]-mean_x2)/sd_x2
+  }
+}
+model{
+  for(i in 1:Ntotal){
+    y[i] ~ dcat(mu[1:Nout,i]) #vectorized over k
+    mu[1:Nout,i]= explambda[1:Nout,i]/expall[i]
+  
+    for(k in 1:Nout){
+      explambda[k,i]= exp( b0[k] + b1[k]*z1[i] + b2[k]*z2[i] )
+    }
+    expall[i]= sum( explambda[1:Nout,i] )        #b0,b1,b2 vectorized over k
+  }
+  
+  for(k in 2:Nout){
+    b0[k] ~ dnorm(0,1/20^2)
+    b1[k] ~ dnorm(0,1/20^2)
+    b2[k] ~ dnorm(0,1/20^2)
+  }
+  b0[1]= 0
+  b1[1]= 0
+  b2[1]= 0
+  
+  # Transform to original scale:
+  c1 <- b1 / sd_x1 
+  c2 <- b2 / sd_x2 
+  c0 <- b0 - b1*mean_x1/sd_x1 - b2*mean_x2/sd_x2
+}
+'
+
+# dataList= list(
+#   x1=x, x2=x,
+#   y= samp,   #pretend it also depends on x2, not only x1
+#   Nout= length(unique(samp)),
+#   Ntotal= length(samp)
+# )
+dSoft= read.csv( file="G:/My Drive/learning/20230220_BayesianStatistics/20230504_BayesianDogsBook/DBDA2Eprograms/SoftmaxRegData1.csv" )
+head(dSoft)
+softList= list(
+  x1= dSoft$X1, x2= dSoft$X2,
+  y= dSoft$Y,
+  Nout= length(unique(dSoft$Y)), Ntotal= dim(dSoft)[1]
+)
+
+jagSoft= jags.model(file=textConnection(softM),data=softList,n.chains=3)
+cSoft= coda.samples(model=jagSoft,variable.names = c('c0','c1','c2'),n.iter=10000)
+
+for (i in 1:length(varnames(cSoft))){
+  diagMCMC(cSoft,parName=varnames(cSoft)[i])
+}
+
+DF1= data.frame(cSoft[[1]])
+hist(DF1[,'c0.1.'])
+hist(DF1[,'c0.2.'])
+hist(DF1[,'c0.3.'])
+hist(DF1[,'c0.4.'])
